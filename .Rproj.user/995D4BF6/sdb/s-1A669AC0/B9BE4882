@@ -1,0 +1,21 @@
+{
+    "collab_server" : "",
+    "contents" : "\n\nlibrary(shiny)\n\nshinyServer(function(input, output) {\n\n  ############# Rank table #####################################\n  output$rank_table <- DT::renderDataTable({\n    DT::datatable(singles_elo %>% mutate(elo = round(elo)), options = list(paging = FALSE), fillContainer = FALSE)\n  })\n\n  ############# Player expectancy #####################################\n  output$player_expectancy <- renderTable(\n    player_odds_df %>% round(3) * 100,\n    rownames = TRUE,\n    digits = 1\n  )\n\n  ############# Games table #####################################\n  output$games_record <- DT::renderDataTable({\n    DT::datatable(singles_games)\n  })\n\n  ############# New Rank plot #####################################\n  output$rank_plot <- renderPlot({\n    players_to_show <- input$playerlist\n\n    ggp <- elo_tracker %>%\n      slice(1:(num_players*(input$games+1))) %>%\n      filter(players %in% players_to_show) %>%\n      ggplot() +\n      geom_line(aes(x = game_num, y = elo, col = players, group = players)) +\n      xlab(\"Game Number\") +\n      ylab(\"Elo\") +\n      theme_minimal()\n\n    if(input$includePoints) {\n      ggp <- ggp +\n        geom_point(aes(x = game_num, y = elo, col = players,\n                       group = players, size = score_diff), alpha = .2)\n    }\n    ggp\n  })\n  ############# Old Rank plot #####################################\n  output$old_rank_plot <- renderPlot({\n\n    ### Get previous data\n    old_elo_tracker <- readRDS(\"../elo_tracker_first_3_months.Rds\")\n    old_player_list <- old_elo_tracker %>%\n      select(players) %>%\n      distinct %>%\n      arrange(players) %>%\n      .[[1]]\n\n    ### Plot it\n    ggp <- old_elo_tracker %>%\n      slice(1:(length(old_player_list)*(input$numGamesOld+1))) %>%\n      filter(players %in% input$playersToShowOld) %>%\n      ggplot() +\n      geom_line(aes(x = game_num, y = elo, col = players, group = players)) +\n      xlab(\"Game Number\") +\n      ylab(\"Elo\") +\n      theme_minimal()\n\n    if(input$includePointsOld) {\n      ggp <- ggp +\n        geom_point(aes(x = game_num, y = elo, col = players,\n                       group = players, size = score_diff), alpha = .2)\n    }\n    ggp\n  })\n\n})\n",
+    "created" : 1478156701477.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "741789157",
+    "id" : "B9BE4882",
+    "lastKnownWriteTime" : 1478201964,
+    "last_content_update" : 1478201964496,
+    "path" : "C:/Users/kevin pan/Dropbox/dev/foos/foos_analysis/server.R",
+    "project_path" : "foos_analysis/server.R",
+    "properties" : {
+        "docOutlineVisible" : "0"
+    },
+    "relative_order" : 8,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}
