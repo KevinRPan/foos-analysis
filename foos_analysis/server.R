@@ -1,5 +1,9 @@
 ##  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ##    Server
+##
+##    This file describes what objects are being rendered.
+##    For example, there are formatting options for the tables.
+##
 ##  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 library(shiny)
@@ -10,48 +14,13 @@ shinyServer(function(input, output) {
   #### Rank table ------------------------------------------------------------
 
   output$rank_table <- renderDataTable({
-    datatable(singles_elo %>%
-                mutate(elo = round(elo)) %>%
-                select(Players = players,
-                       Elo = elo,
-                       "Current win streak" = streak,
-                       "Max win streak" = max_streak,
-                       Wins = wins,
-                       Losses = losses,
-                       "Number of Games" = number_of_games),
-              # options = list(),
-              fillContainer = FALSE,
-              extensions = c('ColReorder', 'Buttons'),
-              options = list(paging = FALSE,
-                             dom = 'Bfrtip',
-                             buttons = I('colvis'),
-                             colReorder = TRUE)) %>%
-      formatStyle(c('Players','Elo'), fontWeight = 'Bold') %>%
-      formatStyle(
-        c('Current win streak',
-          'Max win streak'),
-        background = styleColorBar(range(singles_elo$max_streak),
-                                   'firebrick'),
-        backgroundSize = '75% 80%',
-        backgroundRepeat = 'no-repeat',
-        backgroundPosition = 'right'
-      ) %>%
-      formatStyle(
-        c('Wins',
-          'Losses',
-          'Number of Games'),
-        background = styleColorBar(range(singles_elo$number_of_games),
-                                        'steelblue'),
-        backgroundSize = '75% 80%',
-        backgroundRepeat = 'no-repeat',
-        backgroundPosition = 'right'
-      )
+    singles_elo %>% CreateRankTable
   })
 
   #### Player expectancy ------------------------------------------------------
 
   output$player_expectancy <- renderD3heatmap({
-    "files/singles_elo_2016.Rds" %>% readRDS %>% PlotCoWMatrix()
+    singles_elo %>% PlotCoWMatrix
   })
 
   # renderTable(player_odds_df %>% round(3) * 100,
@@ -59,7 +28,8 @@ shinyServer(function(input, output) {
   #             digits = 1
   # )
 
-  ############# Games table #####################################
+  #### Games table ------------------------------------------------------------
+
   output$games_record <- DT::renderDataTable({
     DT::datatable(singles_games %>%
                     select("Game Number" = game_num,
@@ -67,7 +37,8 @@ shinyServer(function(input, output) {
                            "Player 1" = t1_p1,
                            "Player 1 Score" = t1_score,
                            "Player 2" = t2_p1,
-                           "Player 2 Score" = t2_score)
+                           "Player 2 Score" = t2_score,
+                           'Winner' = winner_1)
     )
   })
 

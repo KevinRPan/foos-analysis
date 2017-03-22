@@ -1,6 +1,10 @@
 ##  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ##    Set constants and define functions
-##    Note: run from foos_elo.R for libraries
+##      Note: run from foos_elo.R for libraries
+##
+##      This file defines functions used in the calculation of elo,
+##        as well as the plots that show up in the app.
+##
 ##  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 #### Constants ============================================================
@@ -9,6 +13,7 @@ elo_diff <- 400
 k <- 32
 base_elo <- 1200
 
+# Elo standards
 # Players below 2100: K-factor of 32 used
 # Players between 2100 and 2400: K-factor of 24 used
 # Players above 2400: K-factor of 16 used.
@@ -103,6 +108,10 @@ GameUpdate <- function(df, player1, score1, player2, score2,
 }
 
 PlotElo <- function(elo_tracker, plot_points = TRUE) {
+  ## Create a plot of elo over the number of games
+  ## Optionally add points to graph
+  ##  that denote the difference in score for a game.
+
   elo_rename <- elo_tracker %>%
     select(Game_Num = game_num,
            Elo = elo,
@@ -161,5 +170,52 @@ PlotCoWMatrix <- function(singles_elo) {
   return(d3heatmap(player_odds_df, Rowv = NULL, Colv = 'Rowv'))
 }
 
+CreateRankTable <- function(singles_elo) {
+  ## Format a table to show:
+  ##  Elo, Streaks, Wins, Losses, Total Games
+  ##  Add bars for streaks and games
+  ##  Add buttons and flexibility for columns
+  rank_table <- datatable(
+    singles_elo %>%
+      mutate(elo = round(elo)) %>%
+      select(
+        Players = players,
+        Elo = elo,
+        "Current win streak" = streak,
+        "Max win streak" = max_streak,
+        Wins = wins,
+        Losses = losses,
+        "Number of Games" = number_of_games
+      ),
 
-
+    fillContainer = FALSE,
+    extensions = c('ColReorder', 'Buttons'),
+    options = list(
+      paging = FALSE,
+      dom = 'Bfrtip',
+      buttons = I('colvis'),
+      colReorder = TRUE
+    )
+  ) %>%
+    formatStyle(c('Players', 'Elo'), fontWeight = 'Bold') %>%
+    formatStyle(
+      c('Current win streak',
+        'Max win streak'),
+      background = styleColorBar(range(singles_elo$max_streak),
+                                 'firebrick'),
+      backgroundSize = '75% 80%',
+      backgroundRepeat = 'no-repeat',
+      backgroundPosition = 'right'
+    ) %>%
+    formatStyle(
+      c('Wins',
+        'Losses',
+        'Number of Games'),
+      background = styleColorBar(range(singles_elo$number_of_games),
+                                 'steelblue'),
+      backgroundSize = '75% 80%',
+      backgroundRepeat = 'no-repeat',
+      backgroundPosition = 'right'
+    )
+  return(rank_table)
+}

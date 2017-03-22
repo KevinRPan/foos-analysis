@@ -1,5 +1,11 @@
 ##  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ##    Foos Elo
+##
+##      This file runs through the calculation of Elo.
+##      1) Read in games
+##      2) Create elo table
+##      3) Run elo calculation loop
+##
 ##  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # if (!require("pacman")) install.packages("pacman")
@@ -15,7 +21,7 @@ library(d3heatmap)
 
 source("files/foos_functions.R")
 
-#### Read in games history ------------------------------------------------------
+#### 1) Read in games history ------------------------------------------------------
 ## Load historic data
 elo_tracker_f3m <- readRDS("files/elo_tracker_first_3_months.Rds")
 singles_games_f3m <- readRDS("files/singles_games_f3m.Rds")
@@ -34,9 +40,9 @@ singles_games_2016 <- readRDS('files/singles_games_2016.rds')
 ## Load current data
 sheet_link <- "https://docs.google.com/spreadsheets/d/1Zjyp6lVjJ1ADfRsK4u8OV9W9kSD7IrDHkwcy_E1iZ5I/edit?usp=sharing"
 
-## Currently demo 2016 matches
-foos <- gs_read(gs_url(sheet_link), ws = 'Matches 2016')
-# foos <- gs_read(gs_url(sheet_link))
+## Currently live data
+foos <- gs_read(gs_url(sheet_link), ws = 'All Matches')
+# foos <- gs_read(gs_url(sheet_link), ws = 'Matches 2016')
 
 colnames(foos) %<>% make_names
 
@@ -46,7 +52,10 @@ singles_games <- foos %>% filter(type == "Singles") %>%
          t1_p1,
          t1_score,
          t2_p1,
-         t2_score)
+         t2_score,
+         winner_1) %>%
+  mutate_at(vars(t1_p1, t2_p1, winner_1),
+            funs(str_extract(., '\\w+') %>% str_to_title))
 
 # singles_games %>% saveRDS('files/singles_games_2016.rds')
 # singles_games %>% saveRDS('files/singles_games_f3m.Rds')
@@ -61,11 +70,13 @@ if(year_variation <- FALSE) {
   third_years <- ''
 }
 
-## Create elo table ------------------------------------------------------------
+#### 2) Create elo table ========================================================
+
 singles_elo <- singles_games %>%
   select(t1_p1, t2_p1) %>%
   stack %>%
   select(players = values) %>%
+  mutate(players = players %>% str_extract('\\w+') %>% str_to_title) %>%
   distinct %>%
   arrange(players) %>%
   mutate(elo = base_elo +
@@ -81,7 +92,8 @@ player_list <- singles_elo %>% .[[1]]
 
 elo_tracker <- singles_elo %>% mutate(game_num = 0, score_diff = 0)
 
-## Run elo calculation loop --------------------------------------------------
+#### 3) Run elo calculation loop =================================================
+
 for(game_num in seq_len(nrow(singles_games))) {
   p1 <- singles_games[game_num, "t1_p1"] %>% as.character
   p2 <- singles_games[game_num, "t2_p1"] %>% as.character
@@ -110,16 +122,18 @@ for(game_num in seq_len(nrow(singles_games))) {
 
 singles_elo %<>% arrange(desc(elo))
 
+#### Optional code for debugging ==============================================
+
 # singles_elo %>% saveRDS('singles_elo_2016.Rds')
 # saveRDS(elo_tracker, "elo_tracker_first_3_months.Rds")
 # saveRDS(elo_tracker, "elo_tracker_2016.Rds")
 
-#### Plot ELO -----------------------------------------------------------------
+## Plot ELO -----------------------------------------------------------------
 
 # elo_plot_first_3_mo <- "elo_tracker_first_3_months.Rds" %>% readRDS %>% PlotElo
 # elo_plot_2016 <- "elo_tracker_2016.Rds" %>% readRDS %>% PlotElo
 
-#### Get chances matrix -------------------------------------------------------
+## Get chances matrix -------------------------------------------------------
 ## Requires singles_elo
 ## Returns a d3 matrix
 # d3_chance_winning <- PlotCoWMatrix(singles_elo)

@@ -1,5 +1,10 @@
 ##  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ##    UI
+##
+##      This file is the User Interface for the app.
+##      This is where the text for each page happens,
+##        and where the structure of the app is defined.
+##
 ##  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 library(shiny)
