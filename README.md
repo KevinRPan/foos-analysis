@@ -32,3 +32,13 @@ The margin of victory multiplier is based on [Nate Silver's NFL Elo system](http
 Here we use: MoV Multiplier = ln(abs(PD)) * (2.2/((ELOW-ELOL)*.001+2.2))
 
 Where PD is the point differential in the game, ELOW is the winning player's Elo Rating before the game, and ELOL is the losing player's Elo Rating before the game.
+
+***
+
+## Examples
+
+Interactively track Elo over time!
+![elo tracking](https://raw.githubusercontent.com/kevinrpan/foos-analysis/master/img/elo_tracker.png)
+
+See expected win chance in matchups! 
+![player expectancy](https://raw.githubusercontent.com/kevinrpan/foos-analysis/master/img/player_expectancy.PNG)
