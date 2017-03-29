@@ -70,7 +70,16 @@ shinyUI(
           p("The latest and greatest, based on",
             tags$a(href = link_to_form, "your inputs"),"!")
         )),
-        plotlyOutput("rank_plot_2017")
+        sidebarLayout(
+          sidebarPanel(
+            radioButtons("includePointsNew", "Include Points?",
+                         c("Yes" = TRUE, "No" = FALSE)),
+            radioButtons("includeLinesNew", "Include Lines?",
+                         c("Yes" = TRUE, "No" = FALSE)),
+            width = 2
+          ),
+          mainPanel(
+            plotlyOutput("rank_plot_2017")))
       ),
       ## 2016 rankings graph --------------------------------------------------
       tabPanel(
@@ -82,7 +91,9 @@ shinyUI(
         )),
         sidebarLayout(
           sidebarPanel(
-            radioButtons("includePoints", "Include Points?",
+            radioButtons("includePoints2016", "Include Points?",
+                         c("Yes" = TRUE, "No" = FALSE)),
+            radioButtons("includeLines2016", "Include Lines?",
                          c("Yes" = TRUE, "No" = FALSE)),
             width = 2
           ),

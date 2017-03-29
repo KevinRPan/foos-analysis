@@ -12,6 +12,7 @@
 elo_diff <- 400
 k <- 32
 base_elo <- 1200
+min_games <- 5
 
 # Elo standards
 # Players below 2100: K-factor of 32 used
@@ -107,24 +108,34 @@ GameUpdate <- function(df, player1, score1, player2, score2,
   return(df)
 }
 
-PlotElo <- function(elo_tracker, plot_points = TRUE) {
+PlotElo <- function(elo_tracker, plot_points = TRUE, plot_lines = TRUE) {
   ## Create a plot of elo over the number of games
   ## Optionally add points to graph
   ##  that denote the difference in score for a game.
+
+  player_game_min <- elo_tracker %>%
+    group_by(players) %>%
+    summarise(number_of_games = max(number_of_games)) %>%
+    filter(number_of_games > min_games) %>%
+    select(players) %>%
+    .[[1]]
+
 
   elo_rename <- elo_tracker %>%
     select(Game_Num = game_num,
            Elo = elo,
            Player = players,
-           Score_Difference = score_diff)
+           Score_Difference = score_diff) %>%
+    filter(Player %in% player_game_min)
 
   ggp <- elo_rename %>%
     ggplot(aes(x = Game_Num, y = Elo,
                col = Player))+ #,group = Player)) +
-    geom_line(alpha = .8) +
     xlab("Game Number") +
     ylab("Elo") +
     theme_minimal()
+    # scale_color_fivethirtyeight() +
+    # theme_fivethirtyeight()
 
   if(plot_points) {
     ggp <- ggp +
@@ -132,6 +143,10 @@ PlotElo <- function(elo_tracker, plot_points = TRUE) {
                data = elo_rename %>%
                  filter(Score_Difference > 0),
                alpha = .2)
+  }
+
+  if(plot_lines) {
+    ggp <- ggp + geom_line(alpha = .8)
   }
 
   return(ggplotly(ggp, tooltip = c('Elo', 'Player', 'Score_Difference')))
@@ -142,10 +157,13 @@ PlotCoWMatrix <- function(singles_elo) {
   # Return a plot of chance of winning
 
   # readRDS('singles_elo_2016.Rds')
-  num_players <- nrow(singles_elo)
-  player_odds <- matrix(vector(), nrow = num_players, ncol = num_players)
 
-  singles_elo_alphabetical <- singles_elo %>% arrange(players)
+  singles_elo_alphabetical <- singles_elo %>%
+    filter(number_of_games > min_games) %>%
+    arrange(players)
+
+  num_players <- nrow(singles_elo_alphabetical)
+  player_odds <- matrix(vector(), nrow = num_players, ncol = num_players)
   player_list <- singles_elo_alphabetical %>% .[[1]]
 
   ## Calculate the matrix of odds -----------------------------------------------

@@ -16,6 +16,7 @@ library(stringr)
 library(knitr)
 library(googlesheets)
 library(ggplot2)
+library(ggthemes)
 library(plotly)
 library(d3heatmap)
 

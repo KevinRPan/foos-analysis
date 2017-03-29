@@ -44,11 +44,13 @@ shinyServer(function(input, output) {
 
   #### 2017 Rank plot --------------------------------------------------
   output$rank_plot_2017 <- renderPlotly({
-    elo_tracker %>% PlotElo
+    elo_tracker %>%
+      PlotElo(input$includePointsNew, input$includeLinesNew)
   })
   #### 2016 Rank plot --------------------------------------------------
   output$rank_plot_2016 <- renderPlotly({
-    "files/elo_tracker_2016.Rds" %>% readRDS %>% PlotElo(input$includePoints)
+    "files/elo_tracker_2016.Rds" %>% readRDS %>%
+      PlotElo(input$includePoints2016, input$includeLines2016)
   })
   #### Old Rank plot --------------------------------------------------
   output$rank_plot_initial <- renderPlotly({
