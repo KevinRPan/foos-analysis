@@ -33,10 +33,11 @@ colnames(player_odds_df) <- player_list
 rownames(player_odds) <- player_list
 colnames(player_odds) <- player_list
 
-melted_odds <- player_odds %>% reshape2::melt()
+# melted_odds <- player_odds %>% reshape2::melt()
 
 ## Create ggplot matrix -------------------------------------------------------
-player_odds_ggp <- melted_odds %>%
+player_odds_ggp <- player_odds %>%
+  reshape2::melt() %>%
   ggplot(aes(x=Var1, y = Var2, fill = 1-value)) +
   # geom_tile() +
   geom_raster() +

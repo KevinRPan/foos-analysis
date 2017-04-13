@@ -13,14 +13,22 @@ shinyServer(function(input, output) {
 
   #### Rank table ------------------------------------------------------------
 
-  output$rank_table <- renderDataTable({
+  output$rank_table <- DT::renderDataTable({
     singles_elo %>% CreateRankTable
   })
 
   #### Player expectancy ------------------------------------------------------
 
+  ## Wrapper for heatmap
+  output$ui_player_expectancy <- renderUI({
+    d3heatmapOutput('player_expectancy')
+  })
   output$player_expectancy <- renderD3heatmap({
     singles_elo %>% PlotCoWMatrix
+  })
+
+  output$player_expectancy_ggp <- renderPlotly({
+    singles_elo %>% PlotCoWMatrix(use_d3 = FALSE)
   })
 
   # renderTable(player_odds_df %>% round(3) * 100,
@@ -31,16 +39,24 @@ shinyServer(function(input, output) {
   #### Games table ------------------------------------------------------------
 
   output$games_record <- DT::renderDataTable({
-    DT::datatable(singles_games %>%
-                    select("Game Number" = game_num,
-                           Date = date,
-                           "Player 1" = t1_p1,
-                           "Player 1 Score" = t1_score,
-                           "Player 2" = t2_p1,
-                           "Player 2 Score" = t2_score,
-                           'Winner' = winner_1)
-    )
+    CreateGamesTable(foos, input$game_type)
   })
+
+
+  #### Games Network --------------------------------------------------
+
+  output$force <- renderForceNetwork({
+    PlotGamesNetwork(singles_elo = singles_elo, singles_games = singles_games)
+  })
+
+  #### Matchups  ------------------------------------------------------------
+
+  output$matchup_table <- DT::renderDataTable({
+    ExamineMatchup(singles_games, input$matchupPlayer) %>%
+      DT::datatable() %>%
+      formatRound(columns = c("Avg pts scored","Avg pts given", "Point Diff"))
+  })
+
 
   #### 2017 Rank plot --------------------------------------------------
   output$rank_plot_2017 <- renderPlotly({

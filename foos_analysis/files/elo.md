@@ -28,11 +28,14 @@ Here we use: MoV Multiplier = ln(abs(PD)) * (2.2/((ELOW-ELOL)*.001+2.2))
 
 Where PD is the point differential in the game, ELOW is the winning player's Elo Rating before the game, and ELOL is the losing player's Elo Rating before the game.
 
+## Application to European Soccer Teams
+
+Check out an identical app that analyzes Euro Soccer teams here: [Euro Soccer analysis](https://kevinrpan.shinyapps.io/euro_soccer_analysis/)
+
 ## Notes
 
 * Players have been arbitrarily assigned initial ratings based on years of experience. These may not be accurate, but game data should correct for this. 
 
 ## Pitfalls
 
-* Low (or 0), and uneven, game counts for many players, let's add some data!
-* No decay for inactive players, so challenge people to make sure their rankings are honest! 
+* Check out [this page](http://andr3w321.com/elo-ratings-part-2-margin-of-victory-adjustments/) that describes some ways to adjust Margin of victory and account for some disadvantages of the system. 

@@ -17,12 +17,15 @@ shinyUI(
   navbarPage(
     title = "Foosball performance analysis",
     theme = shinytheme("flatly"),
+
+    #### Rankings table ----------------------------------------------------
+    ## TODO :: separate by league
     tabPanel(
       "Current rankings",
       fluidRow(column(
-        8,
-        h4("Latest SF Office foosball rankings"),
-        p("So how do you rank up?"),
+        10,
+        h4("Latest SF (and possibly DC??) Office foosball rankings"),
+        p("So how do you rank up? (Note: minimum of 6 singles games to get a ranking.)"),
         p("Add your name to the list - track your games with ",
           tags$a(href = link_to_form, "this form"),
           "to make the rankings more accurate!")
@@ -41,21 +44,20 @@ shinyUI(
           tags$a(href = "http://www.eloratings.net/system.html", "difference in ratings"),
           " method."
         ),
-        p("Read across: Row Player's chance of beating Column Player")
+        # p("Read across: Row Player's chance of beating Column Player")
+        p("The more blue your column, the better!")
       )),
-      d3heatmapOutput("player_expectancy")
-    ),
+      # uiOutput("ui_player_expectancy")
+      plotlyOutput('player_expectancy_ggp'),
+      p("Tip: try clicking and dragging across your column to see your matchups."),
 
-    #### Current games ---------------------------------------------------------
-    tabPanel(
-      "Game records",
-      fluidRow(column(
-        8,
-        h4("Game records"),
-        p("Try searching for your foos-nemesis to see how they've been doing."),
-        p("Note: Doubles games are omitted.")
-      )),
-      DT::dataTableOutput("games_record")
+
+      selectInput(
+        'matchupPlayer',
+        'Player',
+        player_list_all %>% sort
+      ),
+      DT::dataTableOutput("matchup_table")
     ),
 
     navbarMenu(
@@ -70,16 +72,26 @@ shinyUI(
           p("The latest and greatest, based on",
             tags$a(href = link_to_form, "your inputs"),"!")
         )),
-        sidebarLayout(
-          sidebarPanel(
-            radioButtons("includePointsNew", "Include Points?",
-                         c("Yes" = TRUE, "No" = FALSE)),
-            radioButtons("includeLinesNew", "Include Lines?",
-                         c("Yes" = TRUE, "No" = FALSE)),
-            width = 2
-          ),
-          mainPanel(
-            plotlyOutput("rank_plot_2017")))
+        # sidebarLayout(
+          # sidebarPanel(
+
+        fixedRow(column(4,
+                        radioButtons(
+                          "includePointsNew",
+                          "Include Points?",
+                          c("Yes" = TRUE, "No" = FALSE)
+                        )),
+                 column(4,
+                        radioButtons(
+                          "includeLinesNew", "Include Lines?",
+                          c("Yes" = TRUE, "No" = FALSE)
+                        ))),
+        # width = 2
+        # ),
+        # mainPanel(
+        plotlyOutput("rank_plot_2017")
+        # )
+          # )
       ),
       ## 2016 rankings graph --------------------------------------------------
       tabPanel(
@@ -113,8 +125,8 @@ shinyUI(
             "for sweet graphing glory!"
           )
           )),
-        sidebarLayout(
-          sidebarPanel(
+        # sidebarLayout(
+          # sidebarPanel(
             # selectInput(
             #   'playersToShowOld',
             #   'Players to plot',
@@ -123,27 +135,71 @@ shinyUI(
             #   multiple = TRUE,
             #   selectize = TRUE
             # ),
-            sliderInput(
-              "numGamesOld",
-              "Number of games:",
-              min = 1,
-              max = nrow(singles_games_f3m),
-              value = nrow(singles_games_f3m),
-              step = 1,
-              animate = animationOptions(interval = 250, loop = FALSE)
-            ),
-            radioButtons(
-              "includePointsOld",
-              "Include Points?",
-              c("Yes" = TRUE, "No" = FALSE)
-            ),
-            width = 2
-          ),
-          mainPanel(plotlyOutput("rank_plot_initial"))
-        )
-      )),
 
+        fixedRow(column(
+          6,
+          sliderInput(
+            "numGamesOld",
+            "Number of games:",
+            min = 1,
+            max = nrow(singles_games_f3m),
+            value = nrow(singles_games_f3m),
+            step = 1,
+            animate = animationOptions(interval = 250, loop = FALSE)
+          )
+        ),
+        column(4,
+               radioButtons(
+                 "includePointsOld",
+                 "Include Points?",
+                 c("Yes" = TRUE, "No" = FALSE)
+               ))
+        ),
+        # width = 2),
+        # mainPanel(
+        plotlyOutput("rank_plot_initial")
+        )
+    ),
+
+    #### Games Network  ---------------------------------------------------------
+    tabPanel(
+      "Games network",
+      fluidRow(column(
+        8,
+        h4("Games network"),
+        p("Who's played who?")
+      )),
+      forceNetworkOutput("force"),
+      fluidRow(column(
+        8,
+        p("Color is arbitrary for win-streaks groups."),
+        p("Larger dots and thicker links = more games.")
+      ))
+    ),
+
+    #### Current games ---------------------------------------------------------
+    tabPanel(
+      "Game records",
+      fluidRow(column(
+        8,
+        h4("Game records"),
+        p("Try searching for your foos-nemesis to see how they've been doing.")#,
+        # p("Note: Doubles games are omitted.")
+      )),
+      selectInput(
+        "game_type",
+        "Game Type:",
+        c('Singles', 'Doubles'),
+        selected = 'Singles'
+      ),
+      DT::dataTableOutput("games_record")
+    ),
+
+    #### About page  ---------------------------------------------------------
     tabPanel("About Elo",
-             includeMarkdown("files/elo.md"))
+             includeMarkdown("files/elo.md")) #,
+    # tabPanel(
+    #   "Comments",
+
 
   ))

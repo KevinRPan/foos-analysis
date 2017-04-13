@@ -10,17 +10,9 @@
 
 # if (!require("pacman")) install.packages("pacman")
 # pacman::p_install(dplyr, magrittr, stringr, knitr, googlesheets, ggplot2)
-library(dplyr)
-library(magrittr)
-library(stringr)
-library(knitr)
-library(googlesheets)
-library(ggplot2)
-library(ggthemes)
-library(plotly)
-library(d3heatmap)
 
-source("files/foos_functions.R")
+
+source("files/elo_functions.R")
 
 #### 1) Read in games history ------------------------------------------------------
 ## Load historic data
@@ -47,15 +39,20 @@ foos <- gs_read(gs_url(sheet_link), ws = 'All Matches')
 
 colnames(foos) %<>% make_names
 
-singles_games <- foos %>% filter(type == "Singles") %>%
+# doubles_games <- foos %>%
+#   filter(type == 'Doubles')
+
+singles_games <- foos %>%
+  filter(type == "Singles") %>%
   select(game_num,
          date,
-         t1_p1,
+         t1 = t1_p1,
          t1_score,
-         t2_p1,
+         t2 = t2_p1,
          t2_score,
-         winner_1) %>%
-  mutate_at(vars(t1_p1, t2_p1, winner_1),
+         winner_1,
+         comments) %>%
+  mutate_at(vars(t1, t2, winner_1),
             funs(str_extract(., '\\w+') %>% str_to_title))
 
 # singles_games %>% saveRDS('files/singles_games_2016.rds')
@@ -71,58 +68,17 @@ if(year_variation <- FALSE) {
   third_years <- ''
 }
 
-#### 2) Create elo table ========================================================
 
-singles_elo <- singles_games %>%
-  select(t1_p1, t2_p1) %>%
+#### 2) Run elo calculation loop =================================================
+## Singles Games to Singles Elo
+elo_results <- RunCalculationLoop(singles_games)
+singles_elo <- elo_results$singles_elo
+elo_tracker <- elo_results$elo_tracker
+player_list_all <- singles_games %>%
+  select(t1, t2) %>%
   stack %>%
-  select(players = values) %>%
-  mutate(players = players %>% str_extract('\\w+') %>% str_to_title) %>%
-  distinct %>%
-  arrange(players) %>%
-  mutate(elo = base_elo +
-           ifelse(players %in% first_years, -250,
-           ifelse(players %in% third_years, 200, 50)),
-         wins            = 0,
-         losses          = 0,
-         number_of_games = 0,
-         streak          = 0,
-         max_streak      = 0)
-
-player_list <- singles_elo %>% .[[1]]
-
-elo_tracker <- singles_elo %>% mutate(game_num = 0, score_diff = 0)
-
-#### 3) Run elo calculation loop =================================================
-
-for(game_num in seq_len(nrow(singles_games))) {
-  p1 <- singles_games[game_num, "t1_p1"] %>% as.character
-  p2 <- singles_games[game_num, "t2_p1"] %>% as.character
-
-  score1 <- singles_games[game_num, "t1_score"] %>% as.numeric
-  score2 <- singles_games[game_num, "t2_score"] %>% as.numeric
-
-  singles_elo %<>%
-    GameUpdate(p1,
-               score1,
-               p2,
-               score2,
-               print_progress = FALSE)
-  elo_tracker %<>%
-    rbind(
-      singles_elo %>%
-        mutate(
-          game_num = game_num,
-          score_diff = ifelse(
-            players %in% c(p1, p2),
-            abs(score1 - score2),
-            0)
-          )
-    )
-}
-
-singles_elo %<>% arrange(desc(elo))
-
+  distinct(values) %>%
+  .[[1]]
 #### Optional code for debugging ==============================================
 
 # singles_elo %>% saveRDS('singles_elo_2016.Rds')
