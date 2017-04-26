@@ -24,18 +24,69 @@ shinyUI(
       "Current rankings",
       fluidRow(column(
         10,
-        h4("Latest SF (and possibly DC??) Office foosball rankings"),
-        p("So how do you rank up? (Note: minimum of 6 singles games to get a ranking.)"),
+        h4("Latest Office Foosball Rankings"),
+        p("So how do you rank up? (Note: minimum of 6 games to get a ranking.)"),
         p("Add your name to the list - track your games with ",
           tags$a(href = link_to_form, "this form"),
           "to make the rankings more accurate!")
       )),
+      fixedRow(column(4,
+                      radioButtons(
+                        "rankingsOffice",
+                        "Office:",
+                        c('DC', 'SF'),
+                        selected = 'SF'
+                      )),
+               column(4,
+                      radioButtons(
+                        "rankingsGameType",
+                        "Game Type:",
+                        c('Singles' = 'singles_elo', 'Doubles'='dubs_elo'),
+                        selected = 'singles_elo'
+                      ))),
       DT::dataTableOutput("rank_table")
     ),
 
     #### Expectancies table ----------------------------------------------------
     tabPanel(
-      "Player expectancies",
+      "Scores",
+      fluidRow(column(
+        8,
+        h4("PvP scores"),
+        p(
+          "How close are your games?"
+        ),
+        fixedRow(column(4,
+                        checkboxGroupInput(
+                          "scoresOffice",
+                          "Office:",
+                          c('DC', 'SF'),
+                          selected = 'SF'
+                        )),
+                 column(4,
+                        selectInput(
+                          "scoresGameType",
+                          "Game Type:",
+                          c('Singles' = 'singles_elo',
+                            'Sorry, only singles for now'='dubs_elo'),
+                          selected = 'singles_elo'
+                        ))),
+        # p("Read across: Row Player's chance of beating Column Player")
+        p("Goals made versus given, with a simple ratio and averaged by game!")
+      )),
+      DT::dataTableOutput('scores_record'),
+
+      h5("Who are your closest singles competitors?"),
+      selectInput(
+        'matchupPlayer',
+        'Player',
+        player_list_all %>% sort
+      ),
+      DT::dataTableOutput("matchup_table")
+    ),
+    #### Expectancies table ----------------------------------------------------
+    tabPanel(
+      "Matchups",
       fluidRow(column(
         8,
         h4("Expected chance of player match-ups"),
@@ -44,20 +95,26 @@ shinyUI(
           tags$a(href = "http://www.eloratings.net/system.html", "difference in ratings"),
           " method."
         ),
+        fixedRow(column(4,
+                        radioButtons(
+                          "matchupsOffice",
+                          "Office:",
+                          c('DC', 'SF'),
+                          selected = 'SF'
+                        )),
+                 column(4,
+                        radioButtons(
+                          "matchupsGameType",
+                          "Game Type:",
+                          c('Singles' = 'singles_elo', 'Doubles'='dubs_elo'),
+                          selected = 'singles_elo'
+                        ))),
         # p("Read across: Row Player's chance of beating Column Player")
         p("The more blue your column, the better!")
       )),
       # uiOutput("ui_player_expectancy")
       plotlyOutput('player_expectancy_ggp'),
-      p("Tip: try clicking and dragging across your column to see your matchups."),
-
-
-      selectInput(
-        'matchupPlayer',
-        'Player',
-        player_list_all %>% sort
-      ),
-      DT::dataTableOutput("matchup_table")
+      p("Tip: try clicking and dragging across your column to see your matchups.")
     ),
 
     navbarMenu(
@@ -72,8 +129,22 @@ shinyUI(
           p("The latest and greatest, based on",
             tags$a(href = link_to_form, "your inputs"),"!")
         )),
-        # sidebarLayout(
-          # sidebarPanel(
+        fixedRow(column(4,
+                        radioButtons(
+                          "graphsOffice",
+                          "Office:",
+                          c('DC', 'SF'),
+                          selected = 'SF'
+                        )),
+                 column(4,
+                        radioButtons(
+                          "graphsElo",
+                          "Game Type:",
+                          c('Singles' = 'elo_tracker', 'Doubles'='dubs_elo_tracker'),
+                          selected = 'elo_tracker'
+                        ))),
+
+        plotlyOutput("rank_plot_2017"),
 
         fixedRow(column(4,
                         radioButtons(
@@ -85,13 +156,8 @@ shinyUI(
                         radioButtons(
                           "includeLinesNew", "Include Lines?",
                           c("Yes" = TRUE, "No" = FALSE)
-                        ))),
-        # width = 2
-        # ),
-        # mainPanel(
-        plotlyOutput("rank_plot_2017")
-        # )
-          # )
+                        )))
+
       ),
       ## 2016 rankings graph --------------------------------------------------
       tabPanel(
@@ -177,7 +243,7 @@ shinyUI(
       ))
     ),
 
-    #### Current games ---------------------------------------------------------
+    #### Current games records ------------------------------------------------
     tabPanel(
       "Game records",
       fluidRow(column(
@@ -186,8 +252,8 @@ shinyUI(
         p("Try searching for your foos-nemesis to see how they've been doing.")#,
         # p("Note: Doubles games are omitted.")
       )),
-      selectInput(
-        "game_type",
+      radioButtons(
+        "recordsGameType",
         "Game Type:",
         c('Singles', 'Doubles'),
         selected = 'Singles'

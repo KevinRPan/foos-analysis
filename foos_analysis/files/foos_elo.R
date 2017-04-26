@@ -34,10 +34,12 @@ singles_games_2016 <- readRDS('files/singles_games_2016.rds')
 sheet_link <- "https://docs.google.com/spreadsheets/d/1Zjyp6lVjJ1ADfRsK4u8OV9W9kSD7IrDHkwcy_E1iZ5I/edit?usp=sharing"
 
 ## Currently live data
-foos <- gs_read(gs_url(sheet_link), ws = 'All Matches')
+foos <- gs_read(gs_url(sheet_link), ws = 'All Matches') %>%
+  set_colnames(make_names(names(.)))
+
 # foos <- gs_read(gs_url(sheet_link), ws = 'Matches 2016')
 
-colnames(foos) %<>% make_names
+# colnames(foos) %<>% make_names
 
 # doubles_games <- foos %>%
 #   filter(type == 'Doubles')
@@ -51,10 +53,13 @@ singles_games <- foos %>%
          t2 = t2_p1,
          t2_score,
          winner_1,
-         comments) %>%
+         comments,
+         office) %>%
   mutate_at(vars(t1, t2, winner_1),
             funs(str_extract(., '\\w+') %>% str_to_title))
 
+doubles_games <- foos %>%
+  filter(type == 'Doubles')
 # singles_games %>% saveRDS('files/singles_games_2016.rds')
 # singles_games %>% saveRDS('files/singles_games_f3m.Rds')
 
@@ -69,16 +74,32 @@ if(year_variation <- FALSE) {
 }
 
 
-#### 2) Run elo calculation loop =================================================
+#### 2) Run elo calculation loop =============================================
 ## Singles Games to Singles Elo
-elo_results <- RunCalculationLoop(singles_games)
-singles_elo <- elo_results$singles_elo
-elo_tracker <- elo_results$elo_tracker
+
+
+singles_elo_results <- singles_games %>%
+  split(.$office) %>%
+  map(RunCalculationLoop)
+# elo_results <- RunCalculationLoop(singles_games)
+# singles_elo <- elo_results$singles_elo
+# elo_tracker <- elo_results$elo_tracker
 player_list_all <- singles_games %>%
   select(t1, t2) %>%
   stack %>%
   distinct(values) %>%
   .[[1]]
+
+## Doubles Games to Dubs Elo
+dubs_elo_results <- doubles_games %>%
+  split(.$office) %>%
+  map(DoublesCalculationLoop)
+# dubs_elo_results <- DoublesCalculationLoop(doubles_games)
+# dubs_elo <- dubs_elo_results$dubs_elo
+# dubs_elo_tracker <- dubs_elo_results$dubs_elo_tracker
+
+# c(elo_results, dubs_elo_results)[['DC']] %>% glimpse
+elo_results <- Map(c, singles_elo_results, dubs_elo_results)
 #### Optional code for debugging ==============================================
 
 # singles_elo %>% saveRDS('singles_elo_2016.Rds')

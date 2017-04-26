@@ -41,26 +41,26 @@ k2 <- 32
 # Here, going up 200 is significant
 #   so we reduce k to 24 when above 1400
 
-#### Functions ============================================================
+#### Elo calculation functions =============================================
 
 make_names <-
   # Function to clean up column names
   . %>%
   str_trim %>%
   make.names %>%
-  str_replace_all('[.]', '_') %>%
+  str_replace_all("[.]", "_") %>%
   tolower %>%
-  str_replace_all('__{1,4}', '_') %>%
-  str_replace_all('_$', '')
+  str_replace_all("__{1,4}", "_") %>%
+  str_replace_all("_$", "")
 
 
 FormatName <- function(name, use_full_name = FALSE){
-  ## use_full_name can be TRUE, FALSE, or 'none'
+  ## use_full_name can be TRUE, FALSE, or "none"
 
   if(use_full_name == TRUE) {
       name %<>% str_to_title
   } else if(use_full_name == FALSE) {
-    name %<>% str_extract('\\w+') %>% str_to_title
+    name %<>% str_extract("\\w+") %>% str_to_title
   }
   return(name)
 }
@@ -127,9 +127,136 @@ RunCalculationLoop <- function(singles_games, weighted_entry = FALSE, use_full_n
   }
 
   singles_elo %<>% arrange(desc(elo))
-  return(list('singles_elo' = singles_elo, 'elo_tracker' = elo_tracker))
+  return(list("singles_elo" = singles_elo, "elo_tracker" = elo_tracker))
 }
 
+DoublesCalculationLoop <- function(doubles_games,
+                                   weighted_entry = FALSE,
+                                   use_full_name = FALSE) {
+  ## Create elo table ========================================================
+  dubs_elo <- doubles_games %>%
+    select(t1_p1, t1_p2, t2_p1, t2_p2) %>%
+    stack %>%
+    select(players = values) %>%
+    mutate(players = players %<>% FormatName(use_full_name = FALSE)) %>%
+    distinct %>%
+    arrange(players) %>%
+    mutate(elo = base_elo +
+             ifelse(weighted_entry,
+                    ifelse(players %in% first_years, -250,
+                           ifelse(players %in% third_years, 200, 50)),
+                    0),
+           wins            = 0,
+           losses          = 0,
+           number_of_games = 0,
+           streak          = 0,
+           max_streak      = 0)
+
+  dubs_player_list <- dubs_elo %>% .[[1]]
+
+  dubs_elo_tracker <- dubs_elo %>% mutate(game_num = 0, score_diff = 0)
+
+  ## Run elo calculation loop =================================================
+
+  for(game_num in seq_len(nrow(doubles_games))) {
+    t1_p1 <- doubles_games[game_num, "t1_p1"] %>% as.character
+    t1_p2 <- doubles_games[game_num, "t1_p2"] %>% as.character
+    t2_p1 <- doubles_games[game_num, "t2_p1"] %>% as.character
+    t2_p2 <- doubles_games[game_num, "t2_p2"] %>% as.character
+
+    score1 <- doubles_games[game_num, "t1_score"] %>% as.numeric
+    score2 <- doubles_games[game_num, "t2_score"] %>% as.numeric
+
+    dubs_elo %<>%
+      DoublesGameUpdate(t1_p1,
+                        t1_p2,
+                        score1,
+                        t2_p1,
+                        t2_p2,
+                        score2,
+                        print_progress = FALSE)
+    dubs_elo_tracker %<>%
+      rbind(
+        dubs_elo %>%
+          mutate(
+            game_num = game_num,
+            score_diff = ifelse(
+              players %in% c(t1_p1, t1_p2, t2_p1, t2_p2),
+              abs(score1 - score2),
+              0)
+          )
+      )
+  }
+
+  dubs_elo %<>% arrange(desc(elo))
+  return(list("dubs_elo" = dubs_elo, "dubs_elo_tracker" = dubs_elo_tracker))
+}
+
+ExamineScores <- function(singles_games) {
+  ## Get score stats per player
+  scores <- map_df(player_list_all %>% set_names(player_list_all),
+         function(p1) {
+           hth_games <- singles_games %>%
+             filter(t1 == p1 | t2 == p1)
+
+           if (nrow(hth_games) > min_games) {
+             player_games <-
+               bind_rows(
+                 hth_games %>% dplyr::select(player = t1, score = t1_score),
+                 hth_games %>% dplyr::select(player = t2, score = t2_score)
+               )
+
+             player_games %>%
+               mutate(player_goals = ifelse(player == p1, "Scored", "Given")) %>%
+               group_by(player_goals) %>%
+               summarise(total_scored = sum(score)) %>%
+               spread(player_goals, total_scored) %>%
+               mutate(Player = p1) %>%
+               mutate(
+                 avg_score_diff = (Scored - Given) / (nrow(player_games) / 2),
+                 score_ratio = Scored / Given
+               )
+           }
+         }) %>%
+    arrange(desc(avg_score_diff))
+
+  scores %>%
+    select(
+      Player,
+      Scored,
+      Given,
+      "Avg Score Diff" = avg_score_diff,
+      "Score Ratio" = score_ratio
+    ) %>%
+    datatable(
+      fillContainer = FALSE,
+      extensions = c("ColReorder", "Buttons"),
+      options = list(
+        dom = "Bfrtip",
+        buttons = I("colvis"),
+        colReorder = TRUE
+    )
+  ) %>%
+    formatStyle(c("Player", "Avg Score Diff"), fontWeight = "Bold") %>%
+    formatStyle(
+      c("Avg Score Diff"),
+      background = styleColorBar(range(scores$avg_score_diff),
+                                 "steelblue"),
+      backgroundSize = "75% 80%",
+      backgroundRepeat = "no-repeat",
+      backgroundPosition = "right"
+    ) %>%
+    formatStyle(
+      c("Score Ratio"),
+      background = styleColorBar(range(scores$score_ratio),
+                                 "steelblue"),
+      backgroundSize = "75% 80%",
+      backgroundRepeat = "no-repeat",
+      backgroundPosition = "right"
+    ) %>%
+    formatRound(columns = c("Avg Score Diff","Score Ratio")) %>%
+    return
+}
 
 ExamineMatchup <- function(singles_games, p1, p2 = NULL) {
   ## Input games and players to compare
@@ -170,31 +297,31 @@ ExamineMatchup <- function(singles_games, p1, p2 = NULL) {
                   hth_games %>% dplyr::select(player = t2, score = t2_score)) %>%
           group_by(player) %>%
           summarise(avg_score = mean(score)),
-        by = 'player'
+        by = "player"
       ) %>%
         mutate(wins = ifelse(is.na(wins), 0, wins))
 
       matchup <-
         tibble(
-          'Player' = p1,
-          'Matchup' = p2,
-          'Wins against' = compare %>%
+          "Player" = p1,
+          "Matchup" = p2,
+          "Wins against" = compare %>%
             filter(player == p1) %>%
             select(wins) %>%
             .[[1]],
-          'Losses against' = compare %>%
+          "Losses against" = compare %>%
             filter(player == p2) %>%
             select(wins) %>%
             .[[1]],
-          'Avg pts scored' = compare %>%
+          "Avg pts scored" = compare %>%
             filter(player == p1) %>%
             select(avg_score) %>%
             .[[1]],
-          'Avg pts given' = compare %>%
+          "Avg pts given" = compare %>%
             filter(player == p2) %>%
             select(avg_score) %>%
             .[[1]],
-          'Point Diff' =
+          "Point Diff" =
             compare %>%
             filter(player == p1) %>%
             select(avg_score) %>%
@@ -276,6 +403,108 @@ GameUpdate <- function(df, player1, score1, player2, score2,
   return(df)
 }
 
+DoublesGameUpdate <- function(df, t1_p1, t1_p2, score1, t2_p1, t2_p2, score2,
+                              print_progress = FALSE) {
+
+  t1_p1 %<>% FormatName(use_full_name = FALSE)
+  t1_p2 %<>% FormatName(use_full_name = FALSE)
+  t2_p1 %<>% FormatName(use_full_name = FALSE)
+  t2_p2 %<>% FormatName(use_full_name = FALSE)
+
+  t1 <- c(t1_p1, t1_p2)
+  t2 <- c(t2_p1, t2_p2)
+  players <- c(t1, t2)
+  score1  %<>% as.numeric
+  score2  %<>% as.numeric
+
+  elo_t1p1 <- df[grepl(t1_p1, df$players), "elo"] %>% as.numeric
+  elo_t1p2 <- df[grepl(t1_p2, df$players), "elo"] %>% as.numeric
+  elo_t2p1 <- df[grepl(t2_p1, df$players), "elo"] %>% as.numeric
+  elo_t2p2 <- df[grepl(t2_p2, df$players), "elo"] %>% as.numeric
+
+  elo1 <- mean(c(elo_t1p1, elo_t1p2))
+  elo2 <- mean(c(elo_t2p1, elo_t2p2))
+
+  expected1 <- CalculateChance(elo1, elo2)
+  expected2 <- 1 - expected1
+
+  point_diff <- score1 - score2
+
+  margin_of_victory <- log(abs(point_diff))*(2.2/((
+    ifelse(score1 > score2, elo1-elo2, elo2-elo1))*.001+2.2))
+
+  k_adj1 <- ifelse(elo1 > base_elo + reduce_k, k1, k2) * margin_of_victory
+  k_adj2 <- ifelse(elo2 > base_elo + reduce_k, k1, k2) * margin_of_victory
+
+  t1_res <- ifelse(score1 > score2, 1, 0)
+  t2_res <- ifelse(score1 > score2, 0, 1)
+
+  delta_elo1 <- k_adj1*(t1_res - expected1)
+  delta_elo2 <- k_adj2*(t2_res - expected2)
+
+  updated_elo_t1p1 <- elo_t1p1 + delta_elo1
+  updated_elo_t1p2 <- elo_t1p2 + delta_elo1
+  updated_elo_t2p1 <- elo_t2p1 + delta_elo2
+  updated_elo_t2p2 <- elo_t2p2 + delta_elo2
+
+  ## optional progress printing
+  if(print_progress){
+    cat(
+      t1_p1, "T1P1:", elo_t1p1, "->", updated_elo_t1p1, "\t|",
+      t1_p2, "T1P2:", elo_t1p2, "->", updated_elo_t1p2, "\t|",
+      t2_p1, "T2P1:", elo_t2p1, "->", updated_elo_t2p1, "\t|",
+      t2_p2, "T2P2:", elo_t2p2, "->", updated_elo_t2p2, "\n")
+  }
+
+  ## update elo
+  df[grepl(t1_p1, df$players), "elo"] <- updated_elo_t1p1
+  df[grepl(t1_p2, df$players), "elo"] <- updated_elo_t1p2
+  df[grepl(t2_p1, df$players), "elo"] <- updated_elo_t2p1
+  df[grepl(t2_p2, df$players), "elo"] <- updated_elo_t2p2
+
+  ## increment games
+  incrementX <- function(player, field) {
+    df[grepl(player, df$players), field] <-
+      df[grepl(player, df$players), field] + 1
+    return(df)
+  }
+
+  setStreakLoss <- function(loser){
+    df[grepl(loser, df$players), "streak"] <- 0
+    return(df)
+  }
+
+  setStreakMax <- function(winner){
+    df[grepl(winner, df$players), "max_streak"] <<-
+      max(df[grepl(winner, df$players), "streak"],
+          df[grepl(winner, df$players), "max_streak"])
+    return(df)
+  }
+
+  winners <- if(score1 > score2) t1 else t2
+  losers  <- if(score1 > score2) t2 else t1
+
+  for(p in players) {
+    df <- incrementX(p, "number_of_games")
+  }
+
+  for(p in winners) {
+    df <- incrementX(p, "wins")
+    df <- incrementX(p, "streak")
+    df <- setStreakMax(p)
+  }
+
+  for(p in losers) {
+    df <- incrementX(p, "losses")
+    df <- setStreakLoss(p)
+  }
+
+  return(df)
+}
+
+
+#### Plotting functions ====================================================
+
 PlotElo <- function(elo_tracker, plot_points = TRUE, plot_lines = TRUE,
                     use_plotly = FALSE) {
   ## Create a plot of elo over the number of games
@@ -302,17 +531,17 @@ PlotElo <- function(elo_tracker, plot_points = TRUE, plot_lines = TRUE,
     plt <- elo_rename %>%
       plot_ly(x = ~Game_Num,
               y = ~Elo,
-              type = 'scatter',
-              mode = 'lines',
-              text = ~paste('Player:', Player,
-                            '<br>Elo:', Elo %>% round),
+              type = "scatter",
+              mode = "lines",
+              text = ~paste("Player:", Player,
+                            "<br>Elo:", Elo %>% round),
               color = ~Player,
               colors = pal) %>%
       add_trace(y = ~Elo,
-                mode = 'markers',
-                text = ~paste('Player:', Player,
-                              '<br>Elo:', Elo %>% round,
-                              '<br>Score Difference:', Score_Difference),
+                mode = "markers",
+                text = ~paste("Player:", Player,
+                              "<br>Elo:", Elo %>% round,
+                              "<br>Score Difference:", Score_Difference),
                 size = ~Score_Difference,
                 color = ~Player,
                 colors = pal,
@@ -344,16 +573,16 @@ PlotElo <- function(elo_tracker, plot_points = TRUE, plot_lines = TRUE,
     if(plot_lines) {
       ggp <- ggp + geom_line(alpha = .8)
     }
-    plt <- ggplotly(ggp, tooltip = c('Elo', 'Player', 'Score_Difference'))
+    plt <- ggplotly(ggp, tooltip = c("Elo", "Player", "Score_Difference"))
   }
 
   return(plt)
 }
 
-CreateGamesTable <- function(games, game_type = 'Singles') {
+CreateGamesTable <- function(games, game_type = "Singles") {
   ## Input is all games, and game type
 
-  if(game_type == 'Singles') {
+  if(game_type == "Singles") {
     singles_games <- games %>%
       filter(type == "Singles") %>%
       select(game_num,
@@ -365,7 +594,7 @@ CreateGamesTable <- function(games, game_type = 'Singles') {
              winner_1,
              comments) %>%
       mutate_at(vars(t1, t2, winner_1),
-                funs(str_extract(., '\\w+') %>% str_to_title))
+                funs(str_extract(., "\\w+") %>% str_to_title))
 
     DT::datatable(singles_games %>%
                     arrange(desc(game_num)) %>%
@@ -375,10 +604,10 @@ CreateGamesTable <- function(games, game_type = 'Singles') {
                            "Player 1 Score" = t1_score,
                            "Player 2" = t2,
                            "Player 2 Score" = t2_score,
-                           'Winner' = winner_1,
-                           'Comment' = comments)
+                           "Winner" = winner_1,
+                           "Comment" = comments)
     ) %>%
-      formatStyle(c('Winner'), fontWeight = 'Bold')
+      formatStyle(c("Winner"), fontWeight = "Bold")
   } else {
     dubs_games <- games %>%
       filter(type == game_type) %>%
@@ -391,11 +620,11 @@ CreateGamesTable <- function(games, game_type = 'Singles') {
              "Team Y P1" = t2_p1,
              "Team Y P2" = t2_p2,
              "Team Y Score" = t2_score,
-             'Winner P1' = winner_1,
-             'Winner P2' = winner_2,
-             'Comment' = comments) %>%
+             "Winner P1" = winner_1,
+             "Winner P2" = winner_2,
+             "Comment" = comments) %>%
       datatable %>%
-      formatStyle(c('Winner P1', 'Winner P2'), fontWeight = 'Bold')
+      formatStyle(c("Winner P1", "Winner P2"), fontWeight = "Bold")
 
 
   }
@@ -422,11 +651,13 @@ PlotGamesNetwork <- function(singles_elo, singles_games) {
 
   games_network <- forceNetwork(
     Links = game_links,
-    Nodes = singles_elo %>% arrange(players),
+    Nodes = singles_elo %>%
+      distinct(players, .keep_all = TRUE) %>%
+      arrange(players),
     Source = "p1",
     Target = "p2",
     NodeID = "players",
-    Nodesize = 'number_of_games',
+    Nodesize = "number_of_games",
     Group = "max_streak",
     Value = "num_games",
     charge = -50,
@@ -446,7 +677,7 @@ PlotCoWMatrix <- function(singles_elo, use_d3 = TRUE) {
   # Calculate player chance of winning matrix
   # Return a plot of chance of winning
 
-  # readRDS('singles_elo_2016.Rds')
+  # readRDS("singles_elo_2016.Rds")
   singles_elo_alphabetical <- singles_elo %>%
     filter(number_of_games > min_games) %>%
     arrange(players)
@@ -478,7 +709,7 @@ PlotCoWMatrix <- function(singles_elo, use_d3 = TRUE) {
 
 
   if(use_d3) {
-    return(d3heatmap(player_odds_df, Rowv = NULL, Colv = 'Rowv'))
+    return(d3heatmap(player_odds_df, Rowv = NULL, Colv = "Rowv"))
   } else {
     player_odds_ggp <- player_odds %>%
       reshape2::melt() %>%
@@ -501,7 +732,7 @@ PlotCoWMatrix <- function(singles_elo, use_d3 = TRUE) {
             panel.border = element_blank(),
             panel.background = element_blank(),
             axis.ticks = element_blank()) +
-      scale_x_discrete(position = 'top') +
+      scale_x_discrete(position = "top") +
       scale_y_discrete(position = "right") #,
             # legend.position = "bottom",
             # legend.direction = "horizontal") #+
@@ -523,6 +754,7 @@ CreateRankTable <- function(singles_elo, use_paging = FALSE) {
     singles_elo %>%
       filter(number_of_games > min_games) %>%
       mutate(elo = round(elo)) %>%
+      mutate(win_pct = wins/(wins+losses)) %>%
       select(
         Players = players,
         Elo = elo,
@@ -530,37 +762,46 @@ CreateRankTable <- function(singles_elo, use_paging = FALSE) {
         "Max win streak" = max_streak,
         Wins = wins,
         Losses = losses,
-        "Number of Games" = number_of_games
+        "Win Percent" = win_pct
+        # "Number of Games" = number_of_games
       ),
 
     fillContainer = FALSE,
-    extensions = c('ColReorder', 'Buttons'),
+    extensions = c("ColReorder", "Buttons"),
     options = list(
       paging = use_paging,
-      dom = 'Bfrtip',
-      buttons = I('colvis'),
+      dom = "Bfrtip",
+      buttons = I("colvis"),
       colReorder = TRUE
     )
   ) %>%
-    formatStyle(c('Players', 'Elo'), fontWeight = 'Bold') %>%
+    formatStyle(c("Players", "Elo"), fontWeight = "Bold") %>%
     formatStyle(
-      c('Current win streak',
-        'Max win streak'),
+      c("Current win streak",
+        "Max win streak"),
       background = styleColorBar(range(singles_elo$max_streak),
-                                 'firebrick'),
-      backgroundSize = '75% 80%',
-      backgroundRepeat = 'no-repeat',
-      backgroundPosition = 'right'
+                                 "firebrick"),
+      backgroundSize = "75% 80%",
+      backgroundRepeat = "no-repeat",
+      backgroundPosition = "right"
     ) %>%
     formatStyle(
-      c('Wins',
-        'Losses',
-        'Number of Games'),
+      c("Wins",
+        "Losses"),
       background = styleColorBar(range(singles_elo$number_of_games),
-                                 'steelblue'),
-      backgroundSize = '75% 80%',
-      backgroundRepeat = 'no-repeat',
-      backgroundPosition = 'right'
-    )
+                                 "steelblue"),
+      backgroundSize = "75% 80%",
+      backgroundRepeat = "no-repeat",
+      backgroundPosition = "right"
+    ) %>%
+    formatStyle(
+      c("Win Percent"),
+      background = styleColorBar(c(0,1),
+                                 "steelblue"),
+      backgroundSize = "75% 80%",
+      backgroundRepeat = "no-repeat",
+      backgroundPosition = "right"
+    ) %>%
+    formatPercentage("Win Percent")
   return(rank_table)
 }

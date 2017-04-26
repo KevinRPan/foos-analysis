@@ -14,7 +14,8 @@ shinyServer(function(input, output) {
   #### Rank table ------------------------------------------------------------
 
   output$rank_table <- DT::renderDataTable({
-    singles_elo %>% CreateRankTable
+    elo_results[[input$rankingsOffice]][[input$rankingsGameType]] %>%
+      CreateRankTable
   })
 
   #### Player expectancy ------------------------------------------------------
@@ -24,11 +25,13 @@ shinyServer(function(input, output) {
     d3heatmapOutput('player_expectancy')
   })
   output$player_expectancy <- renderD3heatmap({
-    singles_elo %>% PlotCoWMatrix
+    elo_results[[input$matchupsOffice]][[input$matchupsGameType]] %>%
+      PlotCoWMatrix
   })
 
   output$player_expectancy_ggp <- renderPlotly({
-    singles_elo %>% PlotCoWMatrix(use_d3 = FALSE)
+    elo_results[[input$matchupsOffice]][[input$matchupsGameType]] %>%
+      PlotCoWMatrix(use_d3 = FALSE)
   })
 
   # renderTable(player_odds_df %>% round(3) * 100,
@@ -39,14 +42,29 @@ shinyServer(function(input, output) {
   #### Games table ------------------------------------------------------------
 
   output$games_record <- DT::renderDataTable({
-    CreateGamesTable(foos, input$game_type)
+    CreateGamesTable(foos, input$recordsGameType)
   })
+
+
+
+  #### Scores table ------------------------------------------------------------
+
+  output$scores_record <- DT::renderDataTable({
+    singles_games %>%
+      filter(office %in% input$scoresOffice) %>%
+      ExamineScores
+  })
+
 
 
   #### Games Network --------------------------------------------------
 
   output$force <- renderForceNetwork({
-    PlotGamesNetwork(singles_elo = singles_elo, singles_games = singles_games)
+    PlotGamesNetwork(
+      singles_elo = rbind(
+        elo_results[['SF']][['singles_elo']],
+        elo_results[['DC']][['singles_elo']]),
+      singles_games = singles_games)
   })
 
   #### Matchups  ------------------------------------------------------------
@@ -60,7 +78,7 @@ shinyServer(function(input, output) {
 
   #### 2017 Rank plot --------------------------------------------------
   output$rank_plot_2017 <- renderPlotly({
-    elo_tracker %>%
+    elo_results[[input$graphsOffice]][[input$graphsElo]] %>%
       PlotElo(input$includePointsNew, input$includeLinesNew)
   })
   #### 2016 Rank plot --------------------------------------------------
